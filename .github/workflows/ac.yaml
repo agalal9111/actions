@@ -2,7 +2,7 @@ name: Continuous deployment
 on:
   push:
     branches:
-    - uat
+    - main
 
 jobs:
   build-admin:
