@@ -29,8 +29,8 @@ RUN pip3 install --no-cache-dir -r requirements/build.txt
 COPY requirements/optional.txt requirements/optional.txt
 RUN pip3 install --no-cache-dir -r requirements/optional.txt
 
-COPY requirements/runtime.txt requirements/runtime.txt
-RUN pip3 install --no-cache-dir -r requirements/runtime.txt
+#COPY requirements/runtime.txt requirements/runtime.txt
+#RUN pip3 install --no-cache-dir -r requirements/runtime.txt
 
 # Build MMDetection
 RUN python3 setup.py install
