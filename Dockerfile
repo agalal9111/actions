@@ -1,42 +1,40 @@
-FROM nvidia/cuda:12.2.2-base-ubuntu22.04
-ENV DEBIAN_FRONTEND noninteractive
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    build-essential \
-    cmake \
-    libffi-dev \
-    libssl-dev \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libopencv-dev \
-    python3-dev \
-    python3-pip \
+ARG PYTORCH="1.9.0"
+ARG CUDA="11.1"
+ARG CUDNN="8"
+
+FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
+
+ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0 7.5 8.0 8.6+PTX" \
+    TORCH_NVCC_FLAGS="-Xfatbin -compress-all" \
+    CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
+    FORCE_CUDA="1"
+
+# Avoid Public GPG key error
+# https://github.com/NVIDIA/nvidia-docker/issues/1631
+RUN rm /etc/apt/sources.list.d/cuda.list \
+    && rm /etc/apt/sources.list.d/nvidia-ml.list \
+    && apt-key del 7fa2af80 \
+    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub \
+    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub
+
+# (Optional, use Mirror to speed up downloads)
+# RUN sed -i 's/http:\/\/archive.ubuntu.com\/ubuntu\//http:\/\/mirrors.aliyun.com\/ubuntu\//g' /etc/apt/sources.list && \
+#    pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Install the required packages
+RUN apt-get update \
+    && apt-get install -y ffmpeg libsm6 libxext6 git ninja-build libglib2.0-0 libsm6 libxrender-dev libxext6 \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory in the container
+# Install MMEngine and MMCV
+RUN pip install openmim && \
+    mim install "mmengine>=0.7.1" "mmcv>=2.0.0rc4"
+
+# Install MMDetection
+RUN conda clean --all \
+    && git clone https://github.com/open-mmlab/mmdetection.git /mmdetection \
+    && cd /mmdetection \
+    && pip install --no-cache-dir -e .
+
 WORKDIR /mmdetection
-# Clone MMDetection repository
-RUN git clone -b v3.2.0 https://github.com/open-mmlab/mmdetection.git .
-
-# Install Python dependencies
-COPY requirements/build.txt requirements/build.txt
-RUN pip3 install --no-cache-dir -r requirements/build.txt
-
-COPY requirements/optional.txt requirements/optional.txt
-RUN pip3 install --no-cache-dir -r requirements/optional.txt
-
-#COPY requirements/runtime.txt requirements/runtime.txt
-#RUN pip3 install --no-cache-dir -r requirements/runtime.txt
-
-# Build MMDetection
-RUN python3 setup.py install
-
-# Set environment variables if needed
-# ENV CUDA_VISIBLE_DEVICES=0
-
-# Set the default command to run when a container is started
-CMD ["bash"]
